@@ -1,12 +1,12 @@
 import pandas as pd
 from datetime import datetime, timezone
-from typing import List
+
 
 def tag_lineage(df: pd.DataFrame, source_name: str) -> pd.DataFrame:
     """
-    Añade columnas de linaje:
-    - source_file: nombre de origen.
-    - ingested_at: timestamp UTC ISO8601.
+    Añade metadatos de linaje:
+      - source_file: nombre del archivo de origen.
+      - ingested_at: timestamp UTC ISO8601.
     """
     df = df.copy()
     df["source_file"] = source_name
@@ -14,18 +14,24 @@ def tag_lineage(df: pd.DataFrame, source_name: str) -> pd.DataFrame:
     return df
 
 
-def concat_bronze(frames: List[pd.DataFrame]) -> pd.DataFrame:
+def concat_bronze(frames: list[pd.DataFrame]) -> pd.DataFrame:
     """
-    Concatena múltiples DataFrames en esquema Bronze:
-    Columnas esperadas: date, partner, amount, source_file, ingested_at.
+    Concatena DataFrames normalizados y asegura esquema Bronze:
+      columnas = ['date','partner','amount','source_file','ingested_at'].
+    Si alguna falta en un frame, se rellena con NaN.
     """
-    if not frames:
-        return pd.DataFrame(columns=["date", "partner", "amount", "source_file", "ingested_at"])
-
-    bronze = pd.concat(frames, ignore_index=True)
-
-    # Asegurar orden de columnas
     expected_cols = ["date", "partner", "amount", "source_file", "ingested_at"]
-    bronze = bronze[expected_cols]
 
+    fixed_frames = []
+    for f in frames:
+        f = f.copy()
+        # Asegurar que todas las columnas existan
+        for col in expected_cols:
+            if col not in f.columns:
+                f[col] = pd.NA
+        # Reordenar
+        f = f[expected_cols]
+        fixed_frames.append(f)
+
+    bronze = pd.concat(fixed_frames, ignore_index=True)
     return bronze
